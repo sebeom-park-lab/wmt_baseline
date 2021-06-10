@@ -9,17 +9,8 @@ from collections import Counter
 import csv
 
 dirname = "data_2_terminology"
-filenames = ['train.tsv', 'test.tsv', 'dev.tsv']
-
-
-def load_doc():
-    # open the file as read only
-    file = open(filename, mode='rt', encoding='utf-8')
-    # read all text
-    text = file.read()
-    # close the file
-    file.close()
-    return text
+newDirname = "data_2_terminology_new2"
+filenames = ['train.tsv']
 
 
 def to_sentences(doc):
@@ -47,11 +38,8 @@ def clean_lines(line):
     return (' '.join(line))
 
 
-def clean_dataset(filename):
+def clean_dataset(lines):
 
-    lines = [line.rstrip('\n').split('\t')
-             for line in open(filename, 'r').readlines()]
-    print("Original dataset lines : " + str(len(lines)))
     for index, line in enumerate(lines):
         eng_str = clean_lines(line[0])
         fra_str = clean_lines(line[1])
@@ -68,35 +56,31 @@ def clean_dataset(filename):
     return lines
 
 
-def remove_voca(filename, lines):
-    basename = os.path.basename(filename)
-    newName = os.path.splitext(basename)[0] + "_new.tsv"
-    newPath = os.path.join(dirname, newName)
+def remove_voca(newfilename, lines):
 
     #print("Eng voca size : " + str(len(eng_vocab)))
+    count_lines = 0
+    for index, line in enumerate(lines):
 
-    with open(newPath, 'w') as out_file:
-        count_lines = 0
+        lines[index][0] = update_dataset(line[0], eng_vocab)
+        lines[index][1] = update_dataset(line[1], fra_vocab)
+
+        
+        count_lines = count_lines+1
+
+    print("After removing lines : " + str(count_lines))
+    return lines
+
+def write_tsv_file(newfilename, lines):
+    
+    with open(newfilename, 'w') as out_file:
         tsv_writer = csv.writer(out_file, delimiter='\t')
-        for index, line in enumerate(lines):
-
-            converted_eng = update_dataset(line[0], eng_vocab)
-            converted_fra = update_dataset(line[1], fra_vocab)
-
-            len_diff = len(converted_eng) - len(converted_fra)
-            if(len_diff > (len(converted_fra) / 2)):
-                continue
-            tsv_writer.writerow([converted_eng, converted_fra])
-            count_lines = count_lines+1
-
-
-def load_clean_sentences(filename):
-    return load(open(filename, 'rb'))
+        for line in lines :
+            tsv_writer.writerow([line[0], line[1]])
 
 def save_clean_sentences(sentences, filename):
-    dump(sentences, open(filename, 'wb'))
+    dump(sentences, open(filename, 'wb', encoding='UTF8'))
     print('Saved: %s' % filename)
-
 
 
 def to_vocab(lines):
@@ -127,13 +111,102 @@ def trim_vocab(vocab, min_occurance):
     return set(newTokens)
 
 
+def tagging(avail_lines) : 
+
+    filename = "./terminologies/terminologies.fr.txt"
+    lines = [line.rstrip('\n').split('\t')
+             for line in open(filename, 'r', encoding='UTF8').readlines()]
+
+    tmp_dict = {}
+    for line in lines : 
+        en_term = line[3]
+        fr_term = line[4]
+        tmp_dict[en_term] = french_lemm(fr_term)
+
+    print(str(len(tmp_dict)))
+
+
+    for eng_term, fra_term in tmp_dict.items() :
+        re_en = re.compile('(?!> )%s(?! <)'%eng_term, re.I)
+        re_fr = re.compile('(?!> )%s(?! <)'%fra_term, re.I)
+        for idx, lines in enumerate(avail_lines) :
+            en_ = lines[0]
+            en_line2 = re_en.sub('<start> %s <end> '%en_term,en_)
+            if en_line2 != en_ :
+                avail_lines[idx][0] = en_line2
+
+            fr_ = lines[1]
+            fr_line2 = fr_
+            try :
+                m_ = re_fr.search(fr_)
+                fr_line2 = re_fr.sub('<start> %s <end> '%m_.group(), fr_)
+            except :
+                pass
+            if fr_line2 != fr_ :
+                avail_lines[idx][1] = fr_line2
+    
+
+    return avail_lines
+    
+def french_lemm(term):
+    stt = term.split(" ")
+    n_stt = ""
+    for word in stt:
+        if word.endswith("es"):
+            word = word[:-2] +".{,2}"
+        elif word.endswith("s"):
+            word = word[:-1]+ "."
+        elif word.endswith("er"):
+            word = word[:-2]+".{,4}"
+        n_stt += word+" "
+    if n_stt.endswith(" "):
+        return n_stt[:-1]
+    return n_stt
+
+def remove_big_diff(lines):
+    
+    newLines = []
+    for line in lines :
+        eng_line = line[0]
+        fra_line = line[1]
+        len_diff = len(eng_line) - len(fra_line)
+        boundary = len(fra_line)
+        if(len_diff > boundary):
+            continue
+        newLines.append(line)
+    return newLines
 
 
 for filename in filenames :
+
     eng_counter = Counter()
     fra_counter = Counter()
-    filename = os.path.join(dirname, filenames[0])
-    lines = clean_dataset(filename)
-    eng_vocab=trim_vocab(eng_counter,2)
-    fra_vocab=trim_vocab(fra_counter,2)
-    remove_voca(filename, lines)
+    tmp_filename = os.path.join(dirname, filename)
+
+
+    lines = [line.rstrip('\n').split('\t')
+                for line in open(tmp_filename, 'r',encoding='UTF8').readlines()]
+
+    lines = clean_dataset(lines)
+    lines = tagging(lines)
+
+    print("Before removing fault string " + str(len(lines)))
+    #print("ENG token before : " + str(len(eng_counter)))
+    #print("FRA token before : " + str(len(fra_counter)))
+    #eng_vocab=trim_vocab(eng_counter,2)
+    #fra_vocab=trim_vocab(fra_counter,2)
+
+    newfilename = os.path.join(newDirname, filename)
+    if(not os.path.isdir(newDirname)) :
+        os.makedirs(newDirname)
+
+    #lines = remove_voca(newfilename, lines)
+    if("train" in tmp_filename):
+        lines = remove_big_diff(lines)
+
+    print("After removing fault string " + str(len(lines)))
+    write_tsv_file(newfilename,lines)
+
+#print("ENG token after : " + str(len(eng_vocab)))
+#print("Fra token after : " + str(len(fra_vocab)))
+
