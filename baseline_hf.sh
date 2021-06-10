@@ -1,7 +1,7 @@
 model_name=Helsinki-NLP/opus-mt-en-fr
 
 # Use terms
-data_path='data_2_terminology'
+data_path='data_2_terminology_new'
 output_dir='use_terms'
 
 
