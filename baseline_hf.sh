@@ -1,8 +1,8 @@
 model_name=Helsinki-NLP/opus-mt-en-fr
 
 # Use terms
-data_path='data_2_terminology_new'
-output_dir='use_terms'
+data_path='DATASET_NO_REMOVE_NAME_WITH_TAGGING2'
+output_dir='OUT_DATASET_NO_REMOVE_NAME_WITH_TAGGING2'
 
 
 # Don't use terms
@@ -13,9 +13,9 @@ batch_size=32
 eval_batch_size=64
 max_length=128
 
-n_epochs=10
+n_epochs=1
 
-CUDA_VISIBLE_DEVICES=2 python baseline_hf.py --model_name_or_path $model_name \
+CUDA_VISIBLE_DEVICES=3 python3 baseline_hf.py --model_name_or_path $model_name \
                                              --output_dir $output_dir \
                                              --data_path $data_path \
                                              --do_train \
